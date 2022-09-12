@@ -1,10 +1,11 @@
+import logging
 import os
 import time
 from datetime import datetime
 
 import pandas as pd
 
-from powerservice.trading import get_trades
+from powerservice.trading import get_trades, check_if_valid_date
 
 
 class DataValidator:
@@ -27,7 +28,6 @@ class DataValidator:
         :return: The input dataframe augmented with the columns carrying the validation flags
         """
         # work on a copy of data to preserve the input dataframe from side effects
-        validated_df = df.copy()
         validated_df = df.copy()
         validated_df = self._check_invalid_time_format(validated_df)
         validated_df = self._check_invalid_volume(validated_df)
@@ -98,7 +98,7 @@ class DataValidator:
         return validated_df
 
     @staticmethod
-    def _is_hh_mm_time(time_string):
+    def _is_hh_mm_time(time_string: str) -> bool:
         """
         Returns true is a string is in format HH:MM else false.
         Basically a wrapper around a try/except block as python does not have a native function
@@ -112,7 +112,7 @@ class DataValidator:
             return False
 
     @staticmethod
-    def get_valid_trades(validated_trades):
+    def get_valid_trades(validated_trades: pd.DataFrame) -> pd.DataFrame:
         """
         Given a validated dataframe it returns rows not marked with some data quality issue
         :param validated_trades_df: The DataFrame with the validated trades used for data quality profiling
@@ -126,7 +126,7 @@ class DataValidator:
         )]
 
     @staticmethod
-    def get_trade_exceptions(validated_trades_df):
+    def get_trade_exceptions(validated_trades_df: pd.DataFrame) -> pd.DataFrame:
         """
         Given a validated dataframe it returns rows marked with some issue
         :param validated_trades_df: The DataFrame with the validated trades used for data quality profiling
@@ -139,24 +139,30 @@ class DataValidator:
             validated_trades_df['invalid_volume']
         )]
 
-    @staticmethod
-    def get_data_quality_summary(validated_trades_df):
+    def get_data_quality_summary(self, validated_trades_df: pd.DataFrame) -> pd.DataFrame:
         """
         Given a validated dataframe it returns the data quality statistics per trade id
         :param validated_trades_df: The DataFrame with the validated trades used for data quality profiling
         :return: The dataframe with the data quality summary
 
         """
-        df = validated_trades_df.groupby('id').agg({
+        errors_stats_df = validated_trades_df.groupby('id').agg({
             'missing_time': 'sum',
             'invalid_time_format': 'sum',
             'unexpected_time': 'sum',
             'invalid_volume': 'sum',
+        })
+        errors_stats_df = errors_stats_df.add_suffix('_count')
+
+        # We'll compute min and max time only for the valid records
+        valid_trades_df = self.get_valid_trades(validated_trades_df)
+        time_stats_df = valid_trades_df.groupby('id').agg({
             'time': ['min', 'max']
         })
-        df.columns = df.columns.map('_'.join)
-        df.columns = df.columns.str.replace("_sum", "_count")
-        return df
+        # Flatten multi-index
+        time_stats_df.columns = time_stats_df.columns.map('_'.join)
+        result = errors_stats_df.join(time_stats_df)
+        return result
 
 
 class MapReduce:
@@ -168,7 +174,7 @@ class MapReduce:
         """
         Given a valid dataframe with trade volumes on a 5 min frequency,
         returns a dataframe aggregating the data on an hourly basis,
-        remapping time from input timezone to output
+        remapping time from input time zone to output time zone
 
         :param valid_trades_df: The DataFrame with the validated trades used for aggregation
         :return: The dataframe with the trades aggregated on hourly basis
@@ -191,12 +197,13 @@ class MapReduce:
         return aggregated_trades
 
 
-class PersistenceUnit():
+class PersistenceUnit:
 
     def __init__(self, output_path):
         self._output_path = output_path
 
-    def save_results(self, trade_date_str, trade_time_str, aggregated_data, trade_exceptions_df, data_quality_summary):
+    def save_results(self, trade_date_str: str, trade_time_str: str, aggregated_data: pd.DataFrame,
+                     trade_exceptions_df: pd.DataFrame, data_quality_summary: pd.DataFrame):
         """
         The method saves the input dataframes in the configured path using a file format like
         PowerPosition_YYYYMMDD_HHMM.csv,
@@ -212,12 +219,15 @@ class PersistenceUnit():
         :return: None
         """
         filename = f"PowerPosition_{trade_date_str}_{trade_time_str}.csv"
+        logging.info(f"Saving aggregated results to {filename}")
         aggregated_data.to_csv(os.path.join(self._output_path, filename), index=False)
 
         filename = f"PowerPosition_{trade_date_str}_{trade_time_str}_data_profiling.csv"
+        logging.info(f"Saving data quality profiling to {filename}")
         trade_exceptions_df.to_csv(os.path.join(self._output_path, filename), index=False)
 
         filename = f"PowerPosition_{trade_date_str}_{trade_time_str}_data_quality.csv"
+        logging.info(f"Saving data quality summary to {filename}")
         data_quality_summary.to_csv(os.path.join(self._output_path, filename))
 
 
@@ -227,7 +237,7 @@ class PetroineosChallenge:
         self._map_reduce = map_reduce
         self._persistence_unit = persistence_unit
 
-    def process(self, trades: list[dict], trade_date) -> tuple[pd.DataFrame]:
+    def process(self, trades: list[dict], trade_date: str) -> tuple[pd.DataFrame]:
         """
         The method takes the raw input from teh API, validates it, profiles the data quality and persists the results.
         The process is achieved using a Bridge pattern and delegating the core fuctions to handlers injected in the constructor.
@@ -236,12 +246,19 @@ class PetroineosChallenge:
 
         :param trades: A list of dictionaries as provided by the Mock-API
         :param trade_date: The trade date used to fetch the data from the Mock-API
-        :return: a copy of aggregated_data, trade_exceptions, data_quality_summary as persisted
+        :return: a copy of aggregated_data_df, trade_exceptions, data_quality_summary_df as persisted
         """
+        if not check_if_valid_date(date=trade_date):
+            error_msg = f"The supplied date {trade_date} is invalid.Please supply a date in the format d/m/Y."
+            logging.error(error_msg)
+            raise ValueError(error_msg)
+
+        logging.info(f"Processing trade date {trade_date}. We found {len(trades)} trades.")
         trade_exceptions_list = []
         valid_trades_list = []
         validated_trades_list = []
-        # parse all trades in the
+
+        logging.info("Validating trades...")
         for trade in trades:
             trade_df = pd.DataFrame(trade)
             validated_trades = self._validator.validate(trade_df)
@@ -252,16 +269,23 @@ class PetroineosChallenge:
         valid_trades_df = pd.concat(valid_trades_list)
         trade_exceptions_df = pd.concat(trade_exceptions_list)
         validated_trades_df = pd.concat(validated_trades_list)
-        data_quality_summary = self._validator.get_data_quality_summary(validated_trades_df)
-        aggregated_data = self._map_reduce.map_reduce(valid_trades_df)
+        data_quality_summary_df = self._validator.get_data_quality_summary(validated_trades_df)
+        if trade_exceptions_df.shape[0] > 0:
+            # if the number of DQ issues is above a threshold we could throw an error and abort
+            logging.warning(f"we found {trade_exceptions_df.shape[0]} data quality issues in the input data. "
+                            f"Those line will be discarded")
+
+        logging.info("Aggregating data...")
+        aggregated_data_df = self._map_reduce.map_reduce(valid_trades_df)
 
         # Save results
+        logging.info("Saving results...")
         trade_time_str = "0000"
         trade_date_str = datetime.strftime(datetime.strptime(trade_date, "%d/%m/%Y"), "%Y%m%d")
-        self._persistence_unit.save_results(trade_date_str, trade_time_str, aggregated_data, trade_exceptions_df,
-                                            data_quality_summary)
+        self._persistence_unit.save_results(trade_date_str, trade_time_str, aggregated_data_df, trade_exceptions_df,
+                                            data_quality_summary_df)
 
-        return aggregated_data, trade_exceptions_df, data_quality_summary
+        return aggregated_data_df, trade_exceptions_df, data_quality_summary_df
 
 
 def main(trade_date: str, output_path: str):

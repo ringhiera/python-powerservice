@@ -116,10 +116,11 @@ def test_get_data_quality_summary():
         2   01/08/2022	00:10           07d01a7a08c646a68a3cc71b72c337c8  False                True            False            False
         3   01/08/2022	00:01   123     07d01a7a08c646a68a3cc71b72c337c8  False                False           True             False
         4   01/08/2022	00:02   123     07d01a7a08c646a68a3cc71b72c337c8  False                False           True             False
+        5   01/08/2022	00:10   123     07d01a7a08c646a68a3cc71b72c337c8  False                False           False            False
         """)
     expected = str_to_df("""
         id                                missing_time_count  invalid_time_format_count  unexpected_time_count  invalid_volume_count  time_min  time_max
-        07d01a7a08c646a68a3cc71b72c337c8  0                   1                          2                      1                     00:01     25:05
+        07d01a7a08c646a68a3cc71b72c337c8  0                   1                          2                      1                     00:10     00:10
         """)
 
     data_validator = DataValidator()
