@@ -62,7 +62,6 @@ def test__check_unexpected_time():
 
     data_validator = DataValidator()
     actual = data_validator._check_unexpected_time(input)
-    actual.to_csv('c:/tmp/actual.csv')
     assert_frame_equal(actual, expected)
 
 def test__check_missing_time():

@@ -25,10 +25,6 @@ def test_map_reduce():
 ~~~~1~~~00:00~~~~~~~1800
     """, delimiter='~')
 
-    print("expected:\n", expected)
     map_reduce = MapReduce()
     actual = map_reduce.map_reduce(input)
-    actual.to_csv('c:/tmp/actual.csv')
-    print("actual:\n", actual)
-
     assert_frame_equal(actual, expected)
