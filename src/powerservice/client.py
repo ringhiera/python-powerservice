@@ -11,24 +11,23 @@ class DataValidator:
     """
         This class implements an injectable data validator.
         The main method is validate(df), taking the input dataframe and returning a validated df
-        it returns the validated dataframe with records for
+        it returns the validated dataframe with coulmns
         - invalid_time_format: true if timeformat is not "HH:MM"
         - unexpected_time: true if time is not on the 5mins mark
         - missing_time: if any record in the 24h/5min slot is missing
         - invalid_volume: if the volume is missing
-        NOTE: Given the small number and semplicity of the validators we inlined them
-        for projects of higher complexity one might implement them independently and invoke from the validate method
     """
 
     def validate(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        The processor expect the input data to be valid. This method orchestrates abattery of validators to
-        mark valid and invalid dat, so that they can be filtered out.
+        The map_reduce processing step expect the input data to be valid.
+        This method orchestrates a battery of validators to
+        mark valid and invalid data rows, so that they can be filtered out.
         :param df: The input dataframe for validation
         :return: The input dataframe augmented with the columns carrying the validation flags
         """
         # work on a copy of data to preserve the input dataframe from side effects
-        df.to_csv('c:/tmp/df.csv')
+        validated_df = df.copy()
         validated_df = df.copy()
         validated_df = self._check_invalid_time_format(validated_df)
         validated_df = self._check_invalid_volume(validated_df)
@@ -50,7 +49,8 @@ class DataValidator:
     @staticmethod
     def _check_invalid_volume(validated_df: pd.DataFrame) -> pd.DataFrame:
         """
-        The processor expect the volume column to be numeric and populated (Any condition of positive only?).
+        The processor expect the volume column to be numeric and populated
+        NOTE: Given no specific requirement there is no hard condition of positivity implemented.
         Therefore, we are marking all rows where volume is not populated or not parsing to a number
         :param validated_df: The DataFrame with the (partially) validated trades used for data quality profiling
         :return: The input dataframe augmented with invalid_volume column marking any invalid value in the volume column
@@ -62,9 +62,9 @@ class DataValidator:
     @staticmethod
     def _check_unexpected_time(validated_df: pd.DataFrame) -> pd.DataFrame:
         """
-        The processor expect the input to be provided on a 5 minutes tick starting on midnight
+        The processor expect the input to be provided on a 5 minutes frequency starting on midnight
         Therefore, we are expecting one row for each 5 minute interval of the day.
-        This method identifies any interval not aligned with the tick frequency
+        This method identifies any interval not aligned with the frequency frequency
         :param validated_df: The DataFrame with the (partially) validated trades used for data quality profiling
         :return: The input dataframe augmented with unexpected_time column marking any misaligned row
         """
@@ -79,13 +79,13 @@ class DataValidator:
     @staticmethod
     def _check_missing_time(validated_df: pd.DataFrame) -> pd.DataFrame:
         """
-        The processor expect the input to be provided on a 5 minutes tick starting on midnight
+        The processor expect the input to be provided on a 5 minutes frequency starting on midnight
         Therefore, we are expecting one row for each 5 minute interval of the day.
         This method identifies missing intervals
         :param validated_df: The DataFrame with the (partially) validated trades used for data quality profiling
         :return: The input dataframe augmented with missing_time column and a new row for each missing interval
         """
-        # check missing records on expected 5  minutes timeslots
+        # check missing records on expected 5 minutes timeslots
         missing_time = pd.DataFrame(pd.date_range("00:00", "23:59", freq="5min"), columns=['time'])
         missing_time['time'] = missing_time['time'].dt.strftime("%H:%M")
         missing_time['missing_time'] = True
@@ -101,7 +101,7 @@ class DataValidator:
     def _is_hh_mm_time(time_string):
         """
         Returns true is a string is in format HH:MM else false.
-        Basically a wrapper around a try/except block as python does not have
+        Basically a wrapper around a try/except block as python does not have a native function
         :param time_string: The DataFrame with the validated trades used for data quality profiling
         :return: True if time_string is formatted as HH:MM, False otherwise
         """
@@ -144,7 +144,7 @@ class DataValidator:
         """
         Given a validated dataframe it returns the data quality statistics per trade id
         :param validated_trades_df: The DataFrame with the validated trades used for data quality profiling
-        :return: The dataframy with the data quality summary
+        :return: The dataframe with the data quality summary
 
         """
         df = validated_trades_df.groupby('id').agg({
@@ -166,7 +166,7 @@ class MapReduce:
 
     def map_reduce(self, valid_trades_df: pd.DataFrame) -> pd.DataFrame:
         """
-        Given a valid dataframe with trade volumes on a 5 min tick,
+        Given a valid dataframe with trade volumes on a 5 min frequency,
         returns a dataframe aggregating the data on an hourly basis,
         remapping time from input timezone to output
 
@@ -198,7 +198,7 @@ class PersistenceUnit():
 
     def save_results(self, trade_date_str, trade_time_str, aggregated_data, trade_exceptions_df, data_quality_summary):
         """
-        The method saves teh input dataframes in the configured path using a file format like
+        The method saves the input dataframes in the configured path using a file format like
         PowerPosition_YYYYMMDD_HHMM.csv,
         PowerPosition_YYYYMMDD_HHMM_data_profiling.csv,
         PowerPosition_YYYYMMDD_HHMM_data_quality.csv respectively.
@@ -266,7 +266,7 @@ class PetroineosChallenge:
 
 def main(trade_date: str, output_path: str):
     """
-    This is a very simple method showing teh invocation sequence and the dependency injection
+    This is a very simple method showing the invocation sequence and the dependency injection
     """
     # Extract data for provider
     trades = get_trades(date=trade_date)
@@ -279,7 +279,7 @@ def main(trade_date: str, output_path: str):
 
 
 if __name__ == '__main__':
-    # those values can come from caller or from configuration depending on the runtime
+    # those values can come from caller or from configuration depending on the runtime design decisions
     trade_date = '01/08/2022'
     output_path = 'c:/tmp'
 
