@@ -92,12 +92,12 @@ Therefore, one should simply assume the volume data need to be added.
 
 Null values
 -----------
-The generator deliberately sets 1 in 15 time values to NaN, knowing the generating model
+The generator deliberately sets 1 in 16 time values to NaN, knowing the generating model
 allows to interpolate on the timeline and reinstate the missing values.
 However, In a real world setup, this condition is not granted and missing values require to be handled adequately.
 For sake of this exercise we'll report the row as a data quality issue and mark it for reconciliation
 TO note, this approach results in the volume of trades for the  for the day to underestimate the volumes potentially traded as those rows are discarded
-We cannot make any strong assertion about the trades aggregated on an houly basis as we won't be able to impute any of those trades to a particular time slot
+We cannot make any strong assertion about the trades aggregated on an hourly basis as we won't be able to impute any of those trades to a particular time slot
 The user should consider discarded rows and validate the volumes on a case by case basis.
 In real life a datasource with such big data quality issues should be handled with care and assess if it is suitable for purpose
 
@@ -120,7 +120,7 @@ Local time for the day.
 ```
 
 should  be interpreted consistently with the usual issue of mapping
-timezones on utc time e.g. midnight on British summer time maps to 11pm f the previous day in UTC
+timezones on utc time e.g. midnight on British summer time maps to 11pm of the previous day in UTC
 Therefore, one can interpret the requirement as
 
 ```
@@ -131,16 +131,16 @@ Therefore during British Summer Time the values returned by the API for midnight
 Implementation
 ==============
 
-The implementation is quite trivial. Once the specs are clarified it reduces to a quite simple ETL process.
-One can use a bridge pattern with an outer class acting as orchestrator and few handles implementing the processing steps are injected.
+The implementation is quite trivial. Once the specs are clarified it reduces to a simple ETL process.
+One can use a bridge pattern (https://en.wikipedia.org/wiki/Bridge_pattern) with an outer class acting as orchestrator and few handlers implementing the processing steps injected to the constructor.
 
-This approach ahs multiple advantages. firs of all the orchestrator is agnostic to the actual implementation of the processing steps.
+This approach has multiple advantages. Firts of all the orchestrator is agnostic to the actual implementation of the processing steps.
 Moreover, each processing step is self contained and loosely coupled with the rest of the system.
 This approach keeps every component very lean,
 each component can be tested in isolation,
 components can be easily replaced with minor impact on the codebase.
-e.g. if we want to persist in a database we just need to inject a persistency unit writing on a DB.
-The same happen on the validation, if we want to add or modify the validity constraints we can inject a different validator
+e.g. if we want to persist in a database we just need to inject a new persistence unit writing to a DB.
+The same happens on the validation, e.g. if we want to add or modify the validity constraints we can inject a different validator
 and it will do the job seamlessly (even filtering for valid rows is carried out by the validator instance using inversion of control)
 
 
