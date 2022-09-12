@@ -76,6 +76,7 @@ def get_trades(date: str):
     # a randomly chosen number of open trades
     number_of_open_trades = random.randint(1, 101)
     logging.info("Generated" + str(number_of_open_trades) + " open trades randomly.")
+    print("Generated" + str(number_of_open_trades) + " open trades randomly.")
 
     open_trades_list = []
     # Generate a list of open trade dicts

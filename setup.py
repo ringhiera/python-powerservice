@@ -23,7 +23,7 @@ def read(*names, **kwargs):
 
 setup(
     name='powerservice',
-    version='0.0.0',
+    version='0.1.0',
     description='Package generated to interface with a dummy trading system.',
     long_description='%s\n%s' % (
         re.compile('^.. start-badges.*^.. end-badges', re.M | re.S).sub('', read('README.rst')),
@@ -47,7 +47,7 @@ setup(
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3 :: Only',
-        'Programming Language :: Python :: 3.6',
+        # 'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
@@ -62,8 +62,10 @@ setup(
     project_urls={
         'Issue Tracker': 'https://1/taaccount/python-powerservice/issues',
     },
-    python_requires='>=3.6',
+    python_requires='>=3.7',
     install_requires=[
+        'pandas>=1.4.4',
+        'numpy>=1.23.3',
         # eg: 'aspectlib==1.1.1', 'six>=1.7',
     ],
     extras_require={
@@ -71,4 +73,5 @@ setup(
         #   'rst': ['docutils>=0.11'],
         #   ':python_version=="2.6"': ['argparse'],
     },
+    tests_require=['pytest>=7.1.3'],
 )
